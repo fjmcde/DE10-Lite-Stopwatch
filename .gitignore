@@ -1,0 +1,8 @@
+#ignore the following:
+makefile
+*.amp
+*.code-workspace
+*.elf
+*.srec
+src/*.o
+lib/*.o
