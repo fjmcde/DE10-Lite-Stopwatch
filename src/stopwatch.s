@@ -187,11 +187,11 @@ encode_sseg:
     stw     r17, 4(sp)
 
     # get count value
-    movia    r16, %hi(count)
+    movia   r16, count
 
     # encode count value to Hex displays
     movia   r17, SSEG_HEX5_4_BASE_ADDR
-    
+    stwio   r16, 0(r17)
 
     # stack epilogue
     ldw     r17, 4(sp)
@@ -281,12 +281,12 @@ END_ISR:
     addi    sp, sp, 8
 
     eret
-
 .end
 
+count:
+.skip 400
 
 .section .data
 count:
     .word   0
 
-.end
