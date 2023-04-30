@@ -44,16 +44,19 @@ main:
 
     # set function arguements
     movia   r4, INT_TIMER1_BASE_ADDR
-    movhi   r5, %hi(1000000000)
-    ori		r5,	r5, %lo(1000000000)
+    movhi   r5, %hi(100000)
+    ori		r5,	r5, %lo(100000)
     call intTimerInit
+
+    # error checking
+    bne     r2, r0,  program_halt
+
+    # initialize seven segment displays
+    call    init_sseg
 
     # reload caller registers from stack
     ldw     r8, 0(sp)
     addi    sp, sp, 4
-
-    # error checking
-    bne     r2, r0,  program_halt
 
 top_of_loop:
 
@@ -161,19 +164,96 @@ end_init:
 
 
 /*************************************************************
- * encode_sseg(void)
+ * init_sseg(void)
+ * 
+ * Details:
+ *      Initialized the seven segment displays to the
+ *      default 00.00.00
+ *
+ * param: NONE
+ *
+ * Registers Used:
+ *      r16: for loading/storing of peripheral registers
+ *      r17: for intermediate storage or values
+
+ * return: NONE
+ ************************************************************/
+.global init_sseg
+init_sseg:
+    # stack prologue
+    subi    sp, sp, 8
+    stw     r16, 0(sp)
+    stw     r17, 4(sp)
+
+    # store default value for HEX3 - HEX0
+    movia   r16, SSEG_HEX3_0_BASE_ADDR
+    movhi   r17, %hi(SSEG_3_0_DEFAULT)
+    ori     r17, r17, %lo(SSEG_3_0_DEFAULT)   
+    stwio   r16, 0(r17)
+    
+    # store default value for HEX5 - HEX4
+    movia   r16, SSEG_HEX5_4_BASE_ADDR
+    movhi   r17, %hi(SSEG_5_4_DEFAULT)
+    ori     r17, r17, %lo(SSEG_5_4_DEFAULT)   
+    stwio   r16, 0(r17)
+
+    # stack epilogue
+    ldw     r17, 4(sp)
+    ldw     r16, 0(sp)
+    addi    sp, sp, 8
+    ret
+
+
+/*************************************************************
+ * count(void)
+ * 
+ * Details:
+ *      increments the counter variable and returns
+ *      two words to be encoded to the six hex displays
+ *      
+ * param: NONE
+ *
+ * Registers Used:
+ *      r16: for loading/storing of peripheral registers
+ *      r17: for intermediate storage or values
+ *
+ * return:
+ *      r2: value to encode to HEX5 - Hex4
+ *      r3: value to encode to HEX3 - Hex0
+ ************************************************************/
+ .global count
+ count:
+    # stack prologue
+    subi    sp, sp, 8
+    stw     r16, 0(sp)
+    stw     r17, 4(sp)
+
+    
+
+
+    # store return values
+
+
+    # stack epilogue
+    ldw     r17, 4(sp)
+    ldw     r16, 0(sp)
+    addi    sp, sp, 8
+
+    ret
+
+/*************************************************************
+ * encode_sseg(encode_value1, encode_value2)
  * 
  * Details:
  *      Encodes timer value and outputs to the seven segment
  *      displays.
  *
- * param: r4 - timer address
- *      Address of the timer to encode
- * param: r5 - count
- *      Data variable count1 or count 2 for interval timer1
- *      or timer2, respectively
+ * param: r4 - encode_value1
+ *      Value to encode to HEX3 - HEX0
+ * param: r5 - encode_value2
+ *      Value to encode to HEX5 - HEX4
  *
- *  Registers Used:
+ * Registers Used:
  *      r16: for loading/storing of peripheral registers
  *      r17: for intermediate storage or values
  *
@@ -187,7 +267,6 @@ encode_sseg:
     stw     r17, 4(sp)
 
     # get count value
-    movia   r16, count
 
     # encode count value to Hex displays
     movia   r17, SSEG_HEX5_4_BASE_ADDR
@@ -234,7 +313,7 @@ ISR_External:
     stw     r8, 4(sp)
 
 Timer_ISR:
-    # check for timer1 IRQ
+    # check for timer1 IRQ: #1
     andi    r8, et, INT_TIMER1_IRQ
     beq     r8, r0, Timer2
 
@@ -244,7 +323,7 @@ Timer1:
     br      lower_timer_IF
 
 Timer2:
-    # check for timer2 IRQ
+    # check for timer2 IRQ: #3
     andi    r8, et, INT_TIMER2_IRQ
     beq     r8, r0, END_ISR
 
@@ -257,10 +336,17 @@ lower_timer_IF:
     movi    r8, 1
     stwio   r8, 0(et)
 
+    # store return address on stack
+    # prior to function call
+    subi    sp, sp, 4
+    stw     ra, 0(sp)
+
     # increment count
-    movi    r8, count
-    addi    r8, r8, 1
-    stw     r8, 0(count)
+    call    count
+
+    # load ra from stack
+    ldw     ra, 0(sp)
+    addi    sp, sp, 4
 
     # store return address on stack
     # prior to function call
@@ -281,12 +367,17 @@ END_ISR:
     addi    sp, sp, 8
 
     eret
-.end
-
-count:
-.skip 400
 
 .section .data
-count:
-    .word   0
+# counter
+counter:            .word   0 
+# milliseconds
+tenths_ms:          .word   0
+# seconds:
+ones_sec:           .word   0
+tens_sec:           .word   0
+# minutes
+minutes:            .word   0
 
+
+.end
