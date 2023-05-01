@@ -16,7 +16,7 @@
 .equ	SSEG_ENCODE2,       0x5B    # Output 2 to seven segment display
 .equ	SSEG_ENCODE3,       0x4F    # Output 3 to seven segment display
 .equ	SSEG_ENCODE4,       0x66    # Output 4 to seven segment display
-.equ	SSEG_ENCODE5,       0x6c    # Output 5 to seven segment display
+.equ	SSEG_ENCODE5,       0x6D    # Output 5 to seven segment display
 .equ	SSEG_ENCODE6,       0x7D    # Output 6 to seven segment display
 .equ	SSEG_ENCODE7,       0x07    # Output 7 to seven segment display
 .equ	SSEG_ENCODE8,       0x7F    # Output 8 to seven segment display
@@ -26,7 +26,7 @@
 .equ	SSEG_ENCODE2_,      0xDB    # Output 2. to seven segment display
 .equ	SSEG_ENCODE3_,      0xCF    # Output 3. to seven segment display
 .equ	SSEG_ENCODE4_,      0xE6    # Output 4. to seven segment display
-.equ	SSEG_ENCODE5_,      0xEc    # Output 5. to seven segment display
+.equ	SSEG_ENCODE5_,      0xED    # Output 5. to seven segment display
 .equ	SSEG_ENCODE6_,      0xFD    # Output 6. to seven segment display
 .equ	SSEG_ENCODE7_,      0x87    # Output 7. to seven segment display
 .equ	SSEG_ENCODE8_,      0xFF    # Output 8. to seven segment display

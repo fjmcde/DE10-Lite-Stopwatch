@@ -97,9 +97,10 @@ program_halt:
  .global intTimerInit
 intTimerInit:
     # stack prologue
-    subi    sp, sp, 8
-    stw     r16, 0(sp)
-    stw     r17, 4(sp)
+    subi    sp, sp, 12
+	stw		ra, 0(sp)
+    stw     r16, 4(sp)
+    stw     r17, 8(sp)
 
     # check if Timer1 is being used
     movia   r16, INT_TIMER1_BASE_ADDR
@@ -152,10 +153,13 @@ timer_not_running:
 	stwio   r17, 0(r16)
 
 end_init:
+	call    encode_sseg
+
     # stack epilogue
-    ldw     r17, 4(sp)
-    ldw     r16, 0(sp)
-    addi    sp, sp, 8
+    ldw     r17, 8(sp)
+    ldw     r16, 4(sp)
+	ldw		ra, 0(sp)
+    addi    sp, sp, 12
 
     ret
 
@@ -184,13 +188,13 @@ hex_0:
     call    a_mod_n 
     stw     r2, hex_count(r0)
 
-#if(count % 10 == 0)
+    #if(count % 10 == 0)
     bne     r2, r0, end
 hex_1:
 	# byte index for HEX1
     movi    r9, 4
 
-# if(count % 100 == 0) { hex_count[4] = 0 }
+    # if(count % 100 == 0) { hex_count[4] = 0 }
     ldw     r4, 16(sp)
     ldw     r5, mod_array(r9)
     call    a_mod_n
@@ -207,7 +211,7 @@ hex_2:
 	# byte index for HEX2
     movi    r9, 8
 
-# if(count % 1000 == 0) { hex_count[8] = 0 }
+    # if(count % 1000 == 0) { hex_count[8] = 0 }
     ldw     r4, 16(sp)
     ldw     r5, mod_array(r9)
     call    a_mod_n
@@ -225,7 +229,7 @@ hex_3:
 	# byte index for HEX3
     movi    r9, 12
 
-# if(count % 6000 == 0) { hex_count[12] = 0 }
+    # if(count % 6000 == 0) { hex_count[12] = 0 }
     ldw     r4, 16(sp)
     ldw     r5, mod_array(r9)
     call    a_mod_n
@@ -242,7 +246,7 @@ hex_4:
 	# byte index for HEX4
     movi    r9, 16
 
-# if(count % 60000 == 0) { hex_count[16] = 0 }
+    # if(count % 60000 == 0) { hex_count[16] = 0 }
     ldw     r4, 16(sp)
     ldw     r5, mod_array(r9)
     call    a_mod_n
@@ -260,7 +264,7 @@ hex_5:
 	# byte index for HEX5
     movi    r9, 20
 
-# if(count % 600000 == 0) { hex_count[20] = 0 }
+    # if(count % 600000 == 0) { hex_count[20] = 0 }
     ldw     r4, 16(sp)
     ldw     r5, mod_array(r9)
     call    a_mod_n
@@ -344,7 +348,7 @@ encode_sseg:
 	# byte indexing: i = 20
 	movi	r18, 20
 
-# build seven segment packet 1
+    # build seven segment packet 1
 	# converted_bytes = convert_byte(hex_count[20]) << 8
 	ldw		r4, hex_count(r18)
 	call	convert_byte
@@ -363,7 +367,7 @@ encode_sseg:
 
 	subi	r18, r18, 4
 
-# build seven segment packet 2
+    # build seven segment packet 2
 	# converted_bytes = convert_byte(hex_count[12]) << 8
 	ldw		r4, hex_count(r18)
 	call	convert_byte
@@ -379,7 +383,7 @@ encode_sseg:
 	# converted_bytes <<= 16
 	slli	r16, r16, 16
 
-	subi	r18, r18, 8
+	subi	r18, r18, 4
 
 	# converted_bytes |= convert_byte(hex_count[4]) << 8
 	ldw		r4, hex_count(r18)
@@ -387,7 +391,7 @@ encode_sseg:
 	slli	r17, r2, 8
 	or		r16, r16, r17
 
-	# converted_bytes |= convert_byte(hex_count[4])
+	# converted_bytes |= convert_byte(hex_count[0])
 	ldw		r4, hex_count(r0)
 	call	convert_byte
 	or		r16, r16, r2
