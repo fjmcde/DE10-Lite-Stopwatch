@@ -39,8 +39,11 @@ main:
     # set PIE bit
     movi    r8, 1
     wrctl   status, r8
+	
+	# initialize push buttons
+	call push_btns_init
 
-    # set function arguements
+    # error = intTimerInit(timer_addr, timer_value)
     movia   r4, INT_TIMER1_BASE_ADDR
     movhi   r5, %hi(TIMER_COUNTER_VAL)
     ori		r5,	r5, %lo(TIMER_COUNTER_VAL)
@@ -94,7 +97,7 @@ program_halt:
  *       Returns 0 for a valid timer address
  *       Returns -1 for an invalid timer address
  ************************************************************/
- .global intTimerInit
+.global intTimerInit
 intTimerInit:
     # stack prologue
     subi    sp, sp, 12
@@ -111,21 +114,20 @@ intTimerInit:
     # ... else: invalid address
     movi    r2, -1
     br      end_init
-
 timer1:
     #load timer1 IRQ
     movi    r16, INT_TIMER1_IRQ
     br  valid_addr
-
 timer2:
     # load Timer2 IRQ
     movi    r16, INT_TIMER2_IRQ
-
 valid_addr:
     # valid address: set return value
     mov    r2, r0  
 
     # enable timer interrupt
+	rdctl	r17, ienable
+	or		r16, r16, r17
     wrctl   ienable,  r16
 
     # load status register from interval timer
@@ -134,7 +136,6 @@ valid_addr:
 
     # check if timer is already running... 
     bne     r16, r0, end_init
-
 timer_not_running:
     # set counter start value (low)
 	movia	r16, 0xff202008
@@ -151,7 +152,6 @@ timer_not_running:
 	movia	r16, 0xff202004
 	movi	r17, 0x07
 	stwio   r17, 0(r16)
-
 end_init:
 	call    encode_sseg
 
@@ -163,6 +163,31 @@ end_init:
 
     ret
 
+
+.global push_btns_init
+push_btns_init:
+	# stack prologue
+	subi	sp, sp, 8
+	stw		r16, 0(sp)
+	stw		r17, 4(sp)
+	
+	# enable push button interrupts
+    movi    r17, PUSH_BTN_IRQn
+	
+	rdctl	r16, ienable
+	or		r16, r16, r17
+    wrctl   ienable,  r16
+	
+	# set bits in Interrupt Mask register
+	movi	r17, 0b11
+	movia	r16, PUSH_BTNS_BASE_ADDR
+	stwio	r17, 8(r16)
+	
+	# stack epilogue
+	ldw		r17, 4(sp)
+	ldw		r16, 0(sp)
+	addi	sp, sp, 8
+	ret
 
 .global timer_counter
 timer_counter:
@@ -180,7 +205,6 @@ timer_counter:
     stw     r8, 16(sp)
     stw     r9, 20(sp)
     stw     r10, 24(sp)
-
 hex_0:
     # hex_count[0] = a_mod_n(count, 10)
     ldw     r4, 16(sp)
@@ -277,7 +301,6 @@ increment_hex5:
 	addi    r10, r10, 1
 	stw     r10, hex_count(r9)
 	br		end
-
 end:
 	call encode_sseg
 
@@ -416,7 +439,6 @@ encode_sseg:
 /**************************************************
  ***************** SECTION: RESET *****************
  **************************************************/   
-
 .section .reset,    "ax"    # Reset vector 0x00000000
     movia   r2, _start  
     jmp		r2              # Branch to main
@@ -425,7 +447,6 @@ encode_sseg:
 /**************************************************
  ********** SECTION: EXCEPTION HANDLERS ***********
  **************************************************/  
-
 .section .exceptions,   "ax"    # Exception Vector 0x00000020
 EXCEPTION_HANDLER:
     # adjust exception address
@@ -445,21 +466,30 @@ EXCEPTION_HANDLER:
 
 ISR_External:
 Timer_ISR:
-    # check for timer1 IRQ: #1
+    # check for timer1 IRQ: #0
     andi    r8, et, INT_TIMER1_IRQ
+    beq     r8, r0, PUSH_BTN_ISR
     movia   et, INT_TIMER1_BASE_ADDR
 
 lower_timer_IF:
     # write any value to timer status register to
-    # deasset TO bit; lowing the IF
+    # deassert TO bit; lowing the IF
     movi    r8, 1
     stwio   r8, 0(et) 
 
     call    timer_counter
 
-
     br      END_ISR
-
+PUSH_BTN_ISR:
+	# check for push button IRQ: #1
+	andi    r8, et, PUSH_BTN_IRQn
+    beq     r8, r0, END_ISR
+	movia   et, PUSH_BTNS_BASE_ADDR
+LOWER_BTN_IF:
+    # write any value to push button edge capture 
+	# register to lower all interrupt flags
+    movi    r8, 0b11
+    stwio   r8, 12(et) 
 END_ISR:
     # stack epilogue
     ldw     r8, 4(sp)
