@@ -35,3 +35,6 @@
 .equ    INT_TIMER1_IRQ,                 0b001        # Interval timer 1 IRQ1: BIT0
 .equ    INT_TIMER2_IRQ,                 0b100        # Interval timer 2 IRQ2: BIT2
 
+/* TIMER VALUES */
+.equ	TIMER_COUNTER_VAL,		        333332
+

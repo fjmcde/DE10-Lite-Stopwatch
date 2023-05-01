@@ -30,38 +30,36 @@ _start:
 .global main
 main:
     # stack prologue
-    subi    sp, sp, 4
-    stw     ra, 0(sp)
-
+    subi    sp, sp, 16
+	stw     r2, 0(sp)
+	stw     r4, 4(sp)
+	stw     r5, 8(sp)
+	stw     r8, 12(sp)
 
     # set PIE bit
     movi    r8, 1
     wrctl   status, r8
 
-    # store caller registers on stack
-    subi    sp, sp, 4
-    stw     r8, 0(sp)
-
     # set function arguements
     movia   r4, INT_TIMER1_BASE_ADDR
-    movhi   r5, %hi(100000)
-    ori		r5,	r5, %lo(100000)
+    movhi   r5, %hi(TIMER_COUNTER_VAL)
+    ori		r5,	r5, %lo(TIMER_COUNTER_VAL)
     call intTimerInit
 
     # error checking
     bne     r2, r0,  program_halt
 
-    # initialize seven segment displays
-    call    init_sseg
-
     # reload caller registers from stack
-    ldw     r8, 0(sp)
-    addi    sp, sp, 4
+	ldw     r8, 12(sp)
+	ldw     r5, 8(sp)
+	ldw     r4, 4(sp)
+	ldw     r2, 0(sp)
+    addi    sp, sp, 16
 
 # infinite loop
-top_of_loop:
+loop:
 
-    br top_of_loop
+    br	loop
 
 program_halt:
     # stack epilogue
@@ -162,69 +160,139 @@ end_init:
     ret
 
 
-/*************************************************************
- * init_sseg(void)
- * 
- * Details:
- *      Initialized the seven segment displays to the
- *      default 00.00.00
- *
- * param: NONE
- *
- * Registers Used:
- *      r16: for loading/storing of peripheral registers
- *      r17: for intermediate storage or values
+.global timer_counter
+timer_counter:
+    # count++, store on stack
+    ldw     r8, count(r0)
+    addi    r8, r8, 1
+    stw     r8, count(r0)
 
- * return: NONE
- ************************************************************/
-.global init_sseg
-init_sseg:
-    # stack prologue
-    subi    sp, sp, 8
-    stw     r16, 0(sp)
-    stw     r17, 4(sp)
+	# stack prologue
+	subi    sp, sp, 28
+	stw		ra, 0(sp)
+    stw     r2, 4(sp)
+    stw     r4, 8(sp)
+    stw     r5, 12(sp)
+    stw     r8, 16(sp)
+    stw     r9, 20(sp)
+    stw     r10, 24(sp)
 
-    # store default value for HEX3 - HEX0
-    movia   r16, SSEG_HEX3_0_BASE_ADDR
-    movhi   r17, %hi(SSEG_3_0_DEFAULT)
-    ori     r17, r17, %lo(SSEG_3_0_DEFAULT)   
-    stwio   r17, 0(r16)
-    
-    # store default value for HEX5 - HEX4
-    movia   r16, SSEG_HEX5_4_BASE_ADDR
-    movhi   r17, %hi(SSEG_5_4_DEFAULT)
-    ori     r17, r17, %lo(SSEG_5_4_DEFAULT)   
-    stwio   r17, 0(r16)
+hex_0:
+    # hex_count[0] = a_mod_n(count, 10)
+    ldw     r4, 16(sp)
+    ldw     r5, mod_array(r0)
+    call    a_mod_n 
+    stw     r2, hex_count(r0)
 
-    # stack epilogue
-    ldw     r17, 4(sp)
-    ldw     r16, 0(sp)
-    addi    sp, sp, 8
+#if(count % 10 == 0)
+    bne     r2, r0, end
+hex_1:
+	# byte index for HEX1
+    movi    r9, 4
+
+# if(count % 100 == 0) { hex_count[4] = 0 }
+    ldw     r4, 16(sp)
+    ldw     r5, mod_array(r9)
+    call    a_mod_n
+    bne     r2, r0, increment_hex1
+    stw     r0, hex_count(r9)
+	br		hex_2
+increment_hex1:
+	# hex_count[4]++ 
+	ldw     r10, hex_count(r9)
+	addi    r10, r10, 1
+	stw     r10, hex_count(r9)
+	br		end
+hex_2:
+	# byte index for HEX2
+    movi    r9, 8
+
+# if(count % 1000 == 0) { hex_count[8] = 0 }
+    ldw     r4, 16(sp)
+    ldw     r5, mod_array(r9)
+    call    a_mod_n
+    bne     r2, r0, increment_hex2
+	movi	r10, 10
+    stw     r10, hex_count(r9)
+	br		hex_3
+increment_hex2:
+	# hex_count[8]++ 
+	ldw     r10, hex_count(r9)
+	addi    r10, r10, 1
+	stw     r10, hex_count(r9)
+	br		end
+hex_3:
+	# byte index for HEX3
+    movi    r9, 12
+
+# if(count % 6000 == 0) { hex_count[12] = 0 }
+    ldw     r4, 16(sp)
+    ldw     r5, mod_array(r9)
+    call    a_mod_n
+    bne     r2, r0, increment_hex3
+    stw     r0, hex_count(r9)
+	br		hex_4
+increment_hex3:
+	# hex_count[12]++ 
+	ldw     r10, hex_count(r9)
+	addi    r10, r10, 1
+	stw     r10, hex_count(r9)
+	br		end
+hex_4:
+	# byte index for HEX4
+    movi    r9, 16
+
+# if(count % 60000 == 0) { hex_count[16] = 0 }
+    ldw     r4, 16(sp)
+    ldw     r5, mod_array(r9)
+    call    a_mod_n
+    bne     r2, r0, increment_hex4
+	movi	r10, 10
+    stw     r10, hex_count(r9)
+	br		hex_5
+increment_hex4:
+	# hex_count[16]++ 
+	ldw     r10, hex_count(r9)
+	addi    r10, r10, 1
+	stw     r10, hex_count(r9)
+	br		end
+hex_5:
+	# byte index for HEX5
+    movi    r9, 20
+
+# if(count % 600000 == 0) { hex_count[20] = 0 }
+    ldw     r4, 16(sp)
+    ldw     r5, mod_array(r9)
+    call    a_mod_n
+    bne     r2, r0, increment_hex5
+    stw     r0, hex_count(r9)
+	br		end
+increment_hex5:
+	# hex_count[12]++ 
+	ldw     r10, hex_count(r9)
+	addi    r10, r10, 1
+	stw     r10, hex_count(r9)
+	br		end
+
+end:
+	call encode_sseg
+
+    # store on stack
+    ldw     r10, 24(sp)
+    ldw     r9, 20(sp)
+    ldw     r8, 16(sp)
+    ldw     r5, 12(sp) 
+    ldw     r4, 8(sp) 
+    ldw     r2, 4(sp)
+	ldw		ra, 0(sp)
+    addi    sp, sp, 28
+
     ret
-
-
-/*************************************************************
- * mod(a, n)
- * 
- * Details:
- *      Modulo operation
- *
- * param:
- *      r4 - a
- *          dividend term
- *      r5 - n
- *          divisor term 
- *
- * Registers Used:
- *      r16: q - stores the quotient of div
- *      r17: p - stores the product of mul
- *
- * return:
- *      r2 - r
- *          returns the remainder of (a % n)
- ************************************************************/
-.global mod
-mod:
+	
+	
+	
+.global a_mod_n
+a_mod_n:
     # stack prologue
     subi    sp, sp, 8
     stw     r16, 0(sp)
@@ -242,255 +310,103 @@ mod:
     addi    sp, sp, 8
 
     ret   
+	
 
-
-/*************************************************************
- * update_sseg_vals(void)
- * 
- * Details:
- *      updates the values to be output to the 
- *      seven segment displays. 
- *      
- *      NOTE: does not output the values use the
- *      return values as arguements for encode_sseg() 
- *      function
- *
- * param: NONE
- *
- * Registers Used:
- *      r2: to hold return word from mod function
- *      r4: to hold function arguement for mod function
- *      r5: to hold function arguement for mod function
- *      r16: for loading/storing of peripheral registers
- *
- * return: 
- *      r2: value to encode to HEX3 - HEX0
- *      r3: value to encode to HEX5 - HEX4
- ************************************************************/
-.global update_sseg_vals
-update_sseg_vals:
+#	r4 = hex_count[]
+.global convert_byte
+convert_byte:
     # stack prologue
-    subi    sp, sp, 8
-    stw     ra, 0(sp)
-    stw     r16, 4(sp)
+	subi	sp, sp, 4
+	stw		r16, 0(sp)
 
+	muli	r16, r4, 4
+	ldw		r16, encoded_count(r16)
 
-    # hundredths place (ms)
-h_ms:
-	# load & increment dividend term
-	ldw		r4, hundredths_ms(r0)
-	addi	r4, r4, 1
+    mov     r2, r16
 
-    # load divisor term
-    movi    r5, 10
-
-    # r2 = hundredths_ms % 10
-    call    mod
-
-    # store new value
-    stw     r4, hundredths_ms(r0)
-
-    # if(r2 == 0){}
-    bne     r2, r0, end_tick
-    
-    # reset hundredths place (ms) to 0
-    ldw     r4, hundredths_ms(r0)
-    movi    r4, 0
-    stw     r4, hundredths_ms(r0)
-
-# tenths place (ms)
-t_ms:
-    # load & increment dividend term 
-    ldw     r4, tenths_ms(r0)
-    addi    r4, r4, 1
-
-    # load divisor term
-    movi    r5, 10
-
-    # r2 = tenths_ms % 10
-    call    mod
-
-    # store new value
-    stw     r4, tenths_ms(r0)
-
-    #if(r2 == 0)
-    bne     r2, r0, end_tick
-
-    # reset tenths place (ms) to 0
-    ldw     r4, tenths_ms(r0)
-    movi    r4, 0
-    stw     r4, tenths_ms(r0)
-
-# ones place (s)
-o_s:
-    # load & increment dividend term 
-    ldw     r4, ones_sec(r0)
-    addi    r4, r4, 1
-
-    # load divisor term
-    movi    r5, 10
-
-    # r2 = ones_sec % 10
-    call    mod
-
-    # store new value
-    stw     r4, ones_sec(r0)
-
-    #if(r2 == 0)
-    bne     r2, r0, end_tick
-
-    # reset ones place (s) to 0
-    ldw     r4, ones_sec(r0)
-    movi    r4, 0
-    stw     r4, ones_sec(r0)
-
-# tens place (s)
-t_s:
-    # load & increment dividend term 
-    ldw     r4, tens_sec(r0)
-    addi    r4, r4, 1
-
-    # load divisor term
-    movi    r5, 6
-
-    # r2 = tens_sec % 6
-    call    mod
-
-    # store new value
-    stw     r4, tens_sec(r0)
-
-    #if(r2 == 0)
-    bne     r2, r0, end_tick
-
-    # reset tens place (s) to 0
-    ldw     r4, tens_sec(r0)
-    movi    r4, 0
-    stw     r4, tens_sec(r0)
-
-# ones place (min)
-o_m:
-    # load & increment dividend term 
-    ldw     r4, ones_min(r0)
-    addi    r4, r4, 1
-
-    # load divisor term
-    movi    r5, 10
-
-    # r2 = ones_min % 10
-    call    mod
-
-    # store new value
-    stw     r4, ones_min(r0)
-
-    #if(r2 == 0)
-    bne     r2, r0, end_tick
-
-    # reset ones place (min) to 0
-    ldw     r4, ones_min(r0)
-    movi    r4, 0
-    stw     r4, ones_min(r0)
-
-# tens place (min)
-t_m:
-    # load & increment dividend term 
-    ldw     r4, tens_min(r0)
-    addi    r4, r4, 1
-
-    # load divisor term
-    movi    r5, 10
-
-    # r2 = tens_min % 10
-    call    mod
-
-    # store new value
-    stw     r4, tens_min(r0)
-
-    #if(r2 == 0)
-    bne     r2, r0, end_tick
-
-    # reset ones place (min) to 0
-    ldw     r4, tens_min(r0)
-    movi    r4, 0
-    stw     r4, tens_min(r0)
-
-end_tick:
-# Store bytes for HEX3 - HEX0
-# high half word
-    # MSByte
-    ldw     r16, tens_sec(r0)
-    slli    r2, r16, 8
-    # LSByte
-    ldw     r16, ones_sec(r0) 
-    addi    r16, r16, 10             # add ten to encode with decimal point
-    or      r2, r2, r16
-    slli    r2, r2, 16
-
-# low half word
-    # MSByte
-    ldw     r16, tenths_ms(r0)
-    slli    r16, r16, 8
-    or      r2, r2, r16
-    # LSByte
-    ldw     r16, hundredths_ms(r0)
-    or      r2, r2, r16
-
-# store bytes for HEX5 - HEX4
-    # MSByte
-    ldw     r16, tens_min(r0)
-    slli    r3, r16, 8
-    #LSByte
-    ldw     r16, ones_min(r0)
-    addi    r16, r16, 10             # add ten to encode with decimal point
-    or      r3, r3, r16
-    
     # stack epilogue
-    ldw     r16, 4(sp)
-    ldw     ra, 0(sp)
-    addi    sp, sp, 8
-
-    ret
-
-
-/*************************************************************
- * encode_sseg(encode_value1, encode_value2)
- * 
- * Details:
- *      Encodes timer value and outputs to the seven segment
- *      displays.
- *
- * param: r4 - encode_value1
- *      Value to encode to HEX3 - HEX0
- * param: r5 - encode_value2
- *      Value to encode to HEX5 - HEX4
- *
- * Registers Used:
- *      r16: for loading/storing of peripheral registers
- *      r17: for intermediate storage or values
- *
- * return: NONE
- ************************************************************/
+	ldw		r16, 0(sp)
+    addi	sp, sp, 4
+	
+	ret	
+	
 .global encode_sseg
 encode_sseg:
     # stack prologue
-    subi    sp, sp, 8
-    stw     r16, 0(sp)
-    stw     r17, 4(sp)
+    subi    sp, sp, 24
+    stw     ra, 0(sp)
+	stw		r2, 4(sp)
+	stw		r4, 8(sp)
+    stw     r16, 12(sp)
+	stw		r17, 16(sp)
+	stw		r18, 20(sp)
 
-	# encode value to HEX3 - HEX0
-    movia   r16, SSEG_HEX3_0_BASE_ADDR
-    stwio   r4, 0(r16)
+	# byte indexing: i = 20
+	movi	r18, 20
 
-    # encode value to HEX5 - HEX4
-    movia   r16, SSEG_HEX5_4_BASE_ADDR
-    stwio   r5, 0(r16)
+# build seven segment packet 1
+	# converted_bytes = convert_byte(hex_count[20]) << 8
+	ldw		r4, hex_count(r18)
+	call	convert_byte
+	slli	r16, r2, 8
 
+	subi	r18, r18, 4
+
+	# converted_bytes |= convert_byte(hex_count[16])
+	ldw		r4, hex_count(r18)
+	call	convert_byte
+	or		r16, r16, r2
+
+	# encode packet to HEX5 - HEX4
+	movia   r17, SSEG_HEX5_4_BASE_ADDR
+    stwio   r16, 0(r17)
+
+	subi	r18, r18, 4
+
+# build seven segment packet 2
+	# converted_bytes = convert_byte(hex_count[12]) << 8
+	ldw		r4, hex_count(r18)
+	call	convert_byte
+	slli	r16, r2, 8
+
+	subi	r18, r18, 4
+
+	# converted_bytes |= convert_byte(hex_count[8])
+	ldw		r4, hex_count(r18)
+	call 	convert_byte
+	or		r16, r16, r2
+
+	# converted_bytes <<= 16
+	slli	r16, r16, 16
+
+	subi	r18, r18, 8
+
+	# converted_bytes |= convert_byte(hex_count[4]) << 8
+	ldw		r4, hex_count(r18)
+	call	convert_byte
+	slli	r17, r2, 8
+	or		r16, r16, r17
+
+	# converted_bytes |= convert_byte(hex_count[4])
+	ldw		r4, hex_count(r0)
+	call	convert_byte
+	or		r16, r16, r2
+	
+	# encode packet to HEX3 - HEX0
+	movia   r17, SSEG_HEX3_0_BASE_ADDR
+    stwio   r16, 0(r17)
 
     # stack epilogue
-    ldw     r17, 4(sp)
-    ldw     r16, 0(sp)
-    addi    sp, sp, 8
+	ldw		r18, 20(sp)
+	ldw		r17, 16(sp)
+	ldw     r16, 12(sp)
+	ldw		r4, 8(sp)
+	ldw     r2, 4(sp)
+    ldw     ra, 0(sp)
+    addi    sp, sp, 24
 
     ret
+
 
 
 /**************************************************
@@ -502,96 +418,62 @@ encode_sseg:
     jmp		r2              # Branch to main
 
 
-
 /**************************************************
  ********** SECTION: EXCEPTION HANDLERS ***********
  **************************************************/  
 
 .section .exceptions,   "ax"    # Exception Vector 0x00000020
 EXCEPTION_HANDLER:
+    # adjust exception address
+    subi    ea, ea, 4
+
+    # stack prologue
+    subi     sp, sp, 8
+    stw     ra, 0(sp)
+    stw     r8, 4(sp)
+
     # Determine either external or interal IRQ
     rdctl   et, ipending            
     bne     et, r0, ISR_External
 
     # internal exceptions are not handled
-    eret
+    br      END_ISR
 
 ISR_External:
-    # adjust exception address
-    subi    ea, ea, 4
-
-    # stack prologue
-    subi    sp, sp, 8
-    stw     ea, 0(sp)
-    stw     r8, 4(sp)
-
 Timer_ISR:
     # check for timer1 IRQ: #1
     andi    r8, et, INT_TIMER1_IRQ
-    beq     r8, r0, Timer2
-
-Timer1:
-    # fetch timer1 status register
     movia   et, INT_TIMER1_BASE_ADDR
-    br      lower_timer_IF
-
-Timer2:
-    # check for timer2 IRQ: #3
-    andi    r8, et, INT_TIMER2_IRQ
-    beq     r8, r0, END_ISR
-
-    # fetch timer2 status register
-    movia   et, INT_TIMER2_BASE_ADDR
 
 lower_timer_IF:
     # write any value to timer status register to
     # deasset TO bit; lowing the IF
     movi    r8, 1
-    stwio   r8, 0(et)
+    stwio   r8, 0(et) 
 
-    # store ABI compliant registers on stack
-    subi    sp, sp, 20
-    stw     ra, 0(sp)
-    stw     r2, 4(sp)
-    stw     r3, 8(sp)
-    stw     r4, 12(sp)
-    stw     r5, 16(sp)
+    call    timer_counter
 
-    # update seven segment display values
-    call    update_sseg_vals
-
-    # r4, r5 = update_sseg_vals()
-    mov     r4, r2
-    mov     r5, r3
-
-    # encode and output updated sseg values
-    call    encode_sseg
-
-    # load ABI compliant registers from stack
-    ldw     r5, 16(sp)
-    ldw     r4, 12(sp)
-    ldw     r3, 8(sp)
-    ldw     r2, 4(sp)
-    ldw     ra, 0(sp)
-    addi    sp, sp, 20
 
     br      END_ISR
 
 END_ISR:
+    # stack epilogue
     ldw     r8, 4(sp)
-    ldw     ea, 0(sp)
+    ldw     ra, 0(sp)
     addi    sp, sp, 8
 
     eret
 
 .section .data
-# millseconds
-hundredths_ms:      .word   0
-tenths_ms:          .word   0
-# seconds:
-ones_sec:           .word   0
-tens_sec:           .word   0
-# minutes
-ones_min:           .word   0
-tens_min:           .word   0
+hexn:
+    .word   0x3F, 0x3F, 0xBF, 0x3F, 0xBF, 0x3F
+hex_count:
+	.word	0, 0, 10, 0, 10, 0
+encoded_count:
+	.word	0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x67
+	.word 	0xBF, 0x86, 0xDB, 0xCF, 0xE6, 0xED, 0xFD, 0x87, 0xFF, 0xE7
+mod_array:
+	.word	10, 100, 1000, 6000, 60000, 600000
+count:
+	.word	0
 .end
