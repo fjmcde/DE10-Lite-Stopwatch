@@ -536,7 +536,10 @@ RUNNING_BTN0_PRESSED:
 	br		END_BTN_ISR
 RUNNING_BTN1_PRESSED:
 	# Lap/Reset pressed
-	# TODO: STORE LAP TIME
+	# clear ITO bit
+	movia	r8, INT_TIMER1_BASE_ADDR
+	movi	et, 0b1110
+	stwio	et, 4(r8)
 	br		END_BTN_ISR
 END_BTN_ISR:
 	addi	sp, sp, 4
