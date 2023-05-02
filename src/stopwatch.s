@@ -8,8 +8,7 @@
 .global _start
 _start:
     movia   sp, 0x01000000          # setup stack pointer
-    movia   gp, MEM_MIMO_BASE_ADDR  # base address for MIMO
-    
+    movia   gp, MEM_MIMO_BASE_ADDR  # base address for MIMO    
 
     # main should not return; halt if it does
     call main
@@ -449,16 +448,17 @@ encode_sseg:
  **************************************************/  
 .section .exceptions,   "ax"    # Exception Vector 0x00000020
 EXCEPTION_HANDLER:
-    # adjust exception address
+    # adjust exception address and read ipending register
     subi    ea, ea, 4
+	rdctl   et, ipending
 
     # stack prologue
-    subi     sp, sp, 8
+    subi     sp, sp, 12
     stw     ra, 0(sp)
-    stw     r8, 4(sp)
+	stw		et,	4(sp)	# not necessary, but conviently located
+    stw     r8, 8(sp)
 
     # Determine either external or interal IRQ
-    rdctl   et, ipending            
     bne     et, r0, ISR_External
 
     # internal exceptions are not handled
@@ -471,7 +471,7 @@ Timer_ISR:
     beq     r8, r0, PUSH_BTN_ISR
     movia   et, INT_TIMER1_BASE_ADDR
 
-lower_timer_IF:
+LOWER_TIMER_IF:
     # write any value to timer status register to
     # deassert TO bit; lowing the IF
     movi    r8, 1
@@ -481,20 +481,71 @@ lower_timer_IF:
 
     br      END_ISR
 PUSH_BTN_ISR:
+	# store edge capture register state on stack
+	movia   r8, PUSH_BTNS_BASE_ADDR
+	ldwio	r8, 12(r8)
+	subi	sp, sp, 4
+	stw		r8, 0(sp)
+
 	# check for push button IRQ: #1
 	andi    r8, et, PUSH_BTN_IRQn
     beq     r8, r0, END_ISR
-	movia   et, PUSH_BTNS_BASE_ADDR
 LOWER_BTN_IF:
-    # write any value to push button edge capture 
-	# register to lower all interrupt flags
-    movi    r8, 0b11
-    stwio   r8, 12(et) 
+    # write to push button edge capture 
+	# register to lower interrupt flag(s)
+    movia   r8, PUSH_BTNS_BASE_ADDR
+	ldwio	et, 12(r8)
+    stwio   et, 12(r8)
+BTN_SM:
+	# RUN_bit = status_reg << 1
+	movia	r8, INT_TIMER1_BASE_ADDR
+	ldwio	et, 0(r8)
+	srli	et, et, 1
+	
+	#if(RUNNING)
+	bne		et, r0, RUNNING
+STOPPED:
+	# if(Start/Stop)
+	ldw		r8, 0(sp)
+	movi	et,	0b01
+	bne		r8, et,  STOP_BTN1_PRESSED
+STOP_BTN0_PRESSED:
+	# timer_ctrl |= (START + CONT)
+	movia	r8, INT_TIMER1_BASE_ADDR
+	movi	et, 0b111
+	stwio	et, 4(r8)
+	br		END_BTN_ISR
+STOP_BTN1_PRESSED:
+	# Lap/Reset pressed
+	# TODO: reset timer and wait for start/stop
+	br	END_BTN_ISR
+RUNNING:
+	# if(Start/Stop)
+	ldw		r8, 0(sp)
+	movi	et,	0b01
+	bne		r8, et, RUNNING_BTN1_PRESSED
+RUNNING_BTN0_PRESSED:
+	# timer_ctrl = STOP
+	movia	r8, INT_TIMER1_BASE_ADDR
+	movi	et, 0b1000
+	stwio	et, 4(r8)
+	
+	# clear TO bit
+	movi	et, 0b01
+	stwio	et, 0(r8)
+	br		END_BTN_ISR
+RUNNING_BTN1_PRESSED:
+	# Lap/Reset pressed
+	# TODO: STORE LAP TIME
+	br		END_BTN_ISR
+END_BTN_ISR:
+	addi	sp, sp, 4
 END_ISR:
     # stack epilogue
-    ldw     r8, 4(sp)
+    ldw     r8, 8(sp)
+	ldw		et, 4(sp)
     ldw     ra, 0(sp)
-    addi    sp, sp, 8
+    addi    sp, sp, 12
 
     eret
 
