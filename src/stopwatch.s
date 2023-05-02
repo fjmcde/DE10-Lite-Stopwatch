@@ -147,9 +147,9 @@ timer_not_running:
 	srli	r17, r5, 16
 	stwio	r17, 0(r16)
 	
-    # set START, CONT, and ITO bits (0b111)
+    # set stop bit (timer initializes to STOP state)
 	movia	r16, 0xff202004
-	movi	r17, 0x07
+	movi	r17, 0b1000
 	stwio   r17, 0(r16)
 end_init:
 	call    encode_sseg
