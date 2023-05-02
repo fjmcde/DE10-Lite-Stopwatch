@@ -1,3 +1,11 @@
+/*************************************//**
+ * FILE: stopwatch.s
+ * Name: Frank McDermott
+ * Course: ECEN 2360
+ * Instructor: Paul Kooros
+ ****************************************/
+
+
 .include "../lib/de10-lite_mem_map.s"
 .include "../lib/int_timer.s"
 .include "../lib/push_buttons.s"
@@ -10,6 +18,7 @@ _start:
     movia   sp, 0x01000000          # setup stack pointer
     movia   gp, MEM_MIMO_BASE_ADDR  # base address for MIMO
 	call	reset_gpio				# reset GPIO
+	call 	reset_hex_count			# reset hex_count array
 
     # main should not return; halt if it does
     call main
@@ -99,6 +108,49 @@ reset_gpio:
     stwio   r0, 8196(gp)
     ret
 
+/*************************************************************
+ * reset_hex_count(void)
+ *	Details:
+ *	Reset hex_count[] array
+ *
+ *  TODO: Use a loop instead.
+ *
+ *	Params: NONE
+ * 	Return: NONE
+ ************************************************************/
+.global reset_hex_count
+reset_hex_count:
+	# stack prologue
+	subi	sp, sp, 12
+	stw		ra, 0(sp)
+	stw		r16, 4(sp)
+	stw		r17, 8(sp)
+	
+	movi	r16, 20
+	movi	r17, 10
+	
+	stw		r0, hex_count(r16)
+	subi	r16, r16, 4
+	stw		r17, hex_count(r16)
+	subi	r16, r16, 4
+	stw		r0, hex_count(r16)
+	subi	r16, r16, 4
+	stw		r17, hex_count(r16)
+	subi	r16, r16, 4
+	stw		r0, hex_count(r16)
+	subi	r16, r16, 4
+	stw		r0, hex_count(r16)
+	
+	
+	call encode_sseg
+	
+	#stack epilogue
+	ldw		r17, 8(sp)
+	ldw		r16, 4(sp)
+	ldw		ra,	0(sp)
+	addi	sp, sp, 12
+
+	ret
 
 /*************************************************************
  * intTimerInit(timer_addr, start_val)
@@ -601,6 +653,8 @@ STOP_BTN1_PRESSED:
 	# Lap/Reset pressed
 	# reset
 	call reset_gpio
+	call reset_hex_count
+	call encode_sseg
 	br	END_BTN_ISR
 RUNNING:
 	# if(Start/Stop)
