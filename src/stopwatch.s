@@ -76,6 +76,14 @@ program_halt:
  ********************************/  
 
 
+/*************************************************************
+ * reset_gpio(void)
+ *	Details:
+ *	Resets gpio by writing zero to memory
+ *
+ *	Params: NONE
+ * 	Return: NONE
+ ************************************************************/
 .global reset_gpio
 reset_gpio:
     # reset seven segment displays
@@ -90,7 +98,6 @@ reset_gpio:
     stwio   r0, 8192(gp)
     stwio   r0, 8196(gp)
     ret
-
 
 
 /*************************************************************
@@ -181,6 +188,14 @@ end_init:
     ret
 
 
+/*************************************************************
+ * push_btns_init(void)
+ *	Details:
+ *	Initializes push button interrupts
+ *
+ *	Params: NONE
+ * 	Return: NONE
+ ************************************************************/
 .global push_btns_init
 push_btns_init:
 	# stack prologue
@@ -206,6 +221,20 @@ push_btns_init:
 	addi	sp, sp, 8
 	ret
 
+
+/*************************************************************
+ * timer_counter(void)
+ *	Details:
+ *	Interrupt driven counter that increments indices in an
+ *	array which that correspond to each of tyhe five seven
+ *	segment displays. These raw data values are then converted
+ *	to a valid format to display on the seven segment displays.
+ *	
+ *	TODO: Refactor to greatly reduce the size.
+ *
+ *	Params: NONE
+ * 	Return: NONE
+ ************************************************************/
 .global timer_counter
 timer_counter:
     # count++, store on stack
@@ -334,7 +363,18 @@ end:
     ret
 	
 	
-	
+/*************************************************************
+ * r = a_mod_n(a, n)
+ *	Details:
+ *	Returns the remainder of (a % n)
+ *
+ *	Param: r4 - a
+ *		Dividend term (count)
+ *	Param: r5 - n
+ *		Divisor term (mod_value)
+ * 	Return: r2 - r
+ *		Remainder
+ ************************************************************/
 .global a_mod_n
 a_mod_n:
     # stack prologue
@@ -347,7 +387,6 @@ a_mod_n:
 	mul		r17, r16, r5	# p = q * n
 	sub		r2, r4, r17	    # r = a - p
 
-
     # stack epilogue
     ldw     r17, 4(sp)
     ldw     r16, 0(sp)
@@ -356,7 +395,22 @@ a_mod_n:
     ret   
 	
 
-#	r4 = hex_count[]
+/*************************************************************
+ * hex_byte = convert_byte(hex_count[i]) 
+ *	Details:
+ *	Converts a raw counter digit (from a hex_count array index) 
+ *	into a valid seven segment output byte. This is done by
+ *	using the input digit as an index to return a byte from
+ *	the encoded_count[] array.
+ *	hex_count[i] = 2
+ *	encoded_count[2] = 0x06 = 0b0000 0110
+ *
+ *	Param: r4 - hex_count[i]
+ *		Raw counter digit from hex_count array
+ *		
+ * 	Return: r2 - hex_byte
+ *		A valid hex_byte. Used in encode_sseg().
+ ************************************************************/
 .global convert_byte
 convert_byte:
     # stack prologue
@@ -373,7 +427,17 @@ convert_byte:
     addi	sp, sp, 4
 	
 	ret	
-	
+
+
+/*************************************************************
+ * encode_sseg(void)
+ *	Details:
+ *	Outputs encoded hex values resulting from convert_byte()
+ *	to the 6 seven-segment displays
+ *
+ *	Params: NONE
+ * 	Return: NONE
+ ************************************************************/
 .global encode_sseg
 encode_sseg:
     # stack prologue
