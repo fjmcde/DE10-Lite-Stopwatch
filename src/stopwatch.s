@@ -8,7 +8,8 @@
 .global _start
 _start:
     movia   sp, 0x01000000          # setup stack pointer
-    movia   gp, MEM_MIMO_BASE_ADDR  # base address for MIMO    
+    movia   gp, MEM_MIMO_BASE_ADDR  # base address for MIMO
+	call	reset_gpio				# reset GPIO
 
     # main should not return; halt if it does
     call main
@@ -73,6 +74,23 @@ program_halt:
 /********************************
  ********** FUNCTIONS ***********
  ********************************/  
+
+
+.global reset_gpio
+reset_gpio:
+    # reset seven segment displays
+    stwio   r0, 32(gp)
+    stwio   r0, 48(gp)
+    # reset push buttons
+    stwio   r0, 88(gp)
+    stwio   r0, 92(gp)
+    # reset timer
+    stwio   r0, 8200(gp)
+    stwio   r0, 8204(gp)
+    stwio   r0, 8192(gp)
+    stwio   r0, 8196(gp)
+    ret
+
 
 
 /*************************************************************
@@ -517,7 +535,8 @@ STOP_BTN0_PRESSED:
 	br		END_BTN_ISR
 STOP_BTN1_PRESSED:
 	# Lap/Reset pressed
-	# TODO: reset timer and wait for start/stop
+	# reset
+	call reset_gpio
 	br	END_BTN_ISR
 RUNNING:
 	# if(Start/Stop)
